@@ -1,0 +1,20 @@
+[
+    {
+        "id": "game-channels",
+        "defaultCategoryName": "[4-Man]",
+        "defaultCreatorName": "Create [4-Man]",
+        "categoryId": null,
+        "creatorId": null,
+        "userLimit": 4,
+        "phonetic": false
+    },
+    {
+        "id": "meeting-rooms",
+        "defaultCategoryName": "[Meeting Room]",
+        "defaultCreatorName": "Create [Meeting Room]",
+        "categoryId": null,
+        "creatorId": null,
+        "userLimit": null,
+        "phonetic": true
+    }
+]

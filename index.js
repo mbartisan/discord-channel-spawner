@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 
 const {AUTH_TOKEN,GUILD_ID} = require('./config')();
 const PHONETIC_ALPHABET = require('./phonetic-alphabet.json');
@@ -51,9 +52,9 @@ const setupSpawner = async (spawner) => {
     }
 };
 
-const getSpawners = () => JSON.parse(fs.readFileSync('./channel-spawners.json', 'utf8'));
+const getSpawners = () => JSON.parse(fs.readFileSync(path.join(__dirname, 'channel-spawners.json'), 'utf8'));
 const setSpawnerProperty = (id, key, value) => {
-    fs.writeFileSync('./channel-spawners.json', JSON.stringify(getSpawners().map(spawner => {
+    fs.writeFileSync(path.join(__dirname, 'channel-spawners.json'), JSON.stringify(getSpawners().map(spawner => {
         if (spawner.id === id) spawner[key] = value;
         return spawner;
     }), null, 4), 'utf8');

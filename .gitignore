@@ -1,6 +1,6 @@
 node_modules
-./config.js
-./channel-spawners.json
+config.js
+channel-spawners.json
 
 ### Misc ###
 [Tt]humbs.db

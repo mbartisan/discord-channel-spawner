@@ -45,11 +45,6 @@ const setupSpawner = async (spawner) => {
     } else {
         categoryChannel = guild.channels.get(spawner.categoryId);
     }
-
-    if (shouldCreateChannel(spawner.creatorId)) {
-        const creatorChannel = await guild.createChannel(spawner.defaultCreatorName, { type: "voice", parent: categoryChannel.id });
-        setSpawnerProperty(spawner.id, "creatorId", creatorChannel.id);
-    }
 };
 
 const getSpawners = () => JSON.parse(fs.readFileSync(path.join(__dirname, 'channel-spawners.json'), 'utf8'));

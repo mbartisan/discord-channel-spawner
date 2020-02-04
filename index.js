@@ -11,12 +11,18 @@ let guild = null;
 client.login(AUTH_TOKEN);
 
 client.on('message', async (message) => {
-    if (message.content.toLowerCase() !== COMMAND_NAME.toLowerCase() && !message.content.toLowerCase().startsWith(COMMAND_NAME.toLowerCase() + ' ')) return;
     if (message.channel.id !== COMMAND_CHANNEL_ID) return;
+    if (message.author.id === client.user.id) return;
+    if (message.content.toLowerCase() !== COMMAND_NAME.toLowerCase() && !message.content.toLowerCase().startsWith(COMMAND_NAME.toLowerCase() + ' ')) {
+        const errMsg = await message.reply('Invalid command format.');
+        setTimeout(() => errMsg.delete(), 30 * 1000);
+        setTimeout(() => (!message.pinned) ? message.delete() : null, 30 * 1000);
+        return;
+    };
     const args = getArgsFromString(message.content)
     const member = await guild.members.get(message.author.id);
     if (!member.voiceChannel) {
-        member.sendMessage('Please join a voice channel in order to use the `createvoice` command.');
+        member.send('Please join a voice channel in order to use the `createvoice` command.');
         return;
     }
     let channelName = args[1];

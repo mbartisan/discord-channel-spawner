@@ -51,6 +51,7 @@ client.on('message', async (message) => {
         channelName = null;
         userLimit = args[1];
     }
+
     if (args.length >= 2 && !(parseInt(args[2]) == args[2])) {
         // if passed more arguments than expected and the second argument is not a number
         // then the user didn't escape the channel name with quotes

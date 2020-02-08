@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const {AUTH_TOKEN, GUILD_ID, COMMAND_NAME, COMMAND_CHANNEL_ID} = require('./config')();
+const {AUTH_TOKEN,GUILD_ID,BOT_COMMAND_CHANNEL_ID,BOT_COMMAND_NAME,BOT_CHANNEL_SPAWNER_ID} = require('./config')();
 const PHONETIC_ALPHABET = require('./phonetic-alphabet.json');
 
 const Discord = require('discord.js');
@@ -10,47 +10,82 @@ let guild = null;
 
 client.login(AUTH_TOKEN);
 
+client.on('ready', async () => {
+    console.log("Bot Connected");
+    guild = await client.guilds.get(GUILD_ID);
+    getSpawners().forEach(spawnerDefinition => setupSpawner(spawnerDefinition));
+});
+
+client.on("voiceStateUpdate", async (oldMember, newMember) => {
+    cleanChannels();
+
+    const spawner = getSpawners().find(({creatorId}) => newMember.voiceChannelID === creatorId);
+    if (!spawner) return;
+
+    const {categoryId,creatorId,userLimit,phonetic} = spawner;
+
+    const channel = await spawnChannel(categoryId, newMember.displayName + "'s Team", { size: userLimit, phonetic });
+    // if (phonetic === true) await sortPhonetics(categoryId, creatorId); // Discord changed channelOrder permission to admin making this useless
+    await newMember.setVoiceChannel(channel.id);
+
+});
+
 client.on('message', async (message) => {
-    if (message.channel.id !== COMMAND_CHANNEL_ID) return;
-    if (message.author.id === client.user.id) return;
-    if (message.content.toLowerCase() !== COMMAND_NAME.toLowerCase() && !message.content.toLowerCase().startsWith(COMMAND_NAME.toLowerCase() + ' ')) {
+    if (!BOT_COMMAND_NAME) return;
+    if (BOT_COMMAND_CHANNEL_ID && message.channel.id !== BOT_COMMAND_CHANNEL_ID) return;
+    if (message.author.id === client.user.id) return; // If message is from the box, ignore it
+
+    if (message.content.toLowerCase() !== BOT_COMMAND_NAME.toLowerCase() && !message.content.toLowerCase().startsWith(BOT_COMMAND_NAME.toLowerCase() + ' ')) {
         const errMsg = await message.reply('Invalid command format.');
         setTimeout(() => errMsg.delete(), 30 * 1000);
         setTimeout(() => (!message.pinned) ? message.delete() : null, 30 * 1000);
         return;
-    };
-    const args = getArgsFromString(message.content)
-    const member = await guild.members.get(message.author.id);
-    if (!member.voiceChannel) {
-        member.send('Please join a voice channel in order to use the `createvoice` command.');
-        return;
     }
+    const args = getArgsFromString(message.content);
     let channelName = args[1];
     let userLimit = args[2];
-
     if (parseInt(args[1]) == args[1]) {
         // if the first argument is a number
         // then the user only specified the userLimit
         channelName = null;
         userLimit = args[1];
     }
-
     if (parseInt(userLimit) > 99) userLimit = 99;
 
+    const member = await guild.members.get(message.author.id);
+    if (!member.voiceChannel) {
+        member.send('Please join a voice channel in order to use the `$createvoice` command.');
+        return;
+    }
+
     if (!channelName) channelName = `${message.author.username}'s Team`;
-    const channel = await guild.createChannel(channelName, { type: "voice", parent: getSpawners()[0].categoryId, userLimit });
+    const categoryId = getSpawners().find(cs=>cs.id===BOT_CHANNEL_SPAWNER_ID).categoryId;
+    const channel = await spawnChannel(categoryId, channelName, { size: userLimit });
     member.setVoiceChannel(channel.id);
     message.delete();
 });
 
-client.on('ready', async () => {
-    console.log("Bot Connected");
-    guild = await client.guilds.get(GUILD_ID);
-});
+const setupSpawner = async (spawner) => {
+    const shouldCreateChannel = (channelId) => {
+        if (channelId == null || channelId === "null" || channelId === "") return true;
+        if (!guild.channels.get(channelId)) return true;
+        return false;
+    };
 
-client.on("voiceStateUpdate", async (oldMember, newMember) => {
-    cleanChannels();
-});
+    let categoryChannel = null;
+
+    if (shouldCreateChannel(spawner.categoryId)) {
+        categoryChannel = await guild.createChannel(spawner.defaultCategoryName, { type: "category" });
+        setSpawnerProperty(spawner.id, "categoryId", categoryChannel.id);
+    } else {
+        categoryChannel = guild.channels.get(spawner.categoryId);
+    }
+
+    if (shouldCreateChannel(spawner.creatorId)) {
+        const creatorChannel = await guild.createChannel(spawner.defaultCreatorName, { type: "voice", parent: categoryChannel.id });
+        setSpawnerProperty(spawner.id, "creatorId", creatorChannel.id);
+    }
+};
 
 const getSpawners = () => JSON.parse(fs.readFileSync(path.join(__dirname, 'channel-spawners.json'), 'utf8'));
 const setSpawnerProperty = (id, key, value) => {
@@ -60,15 +95,15 @@ const setSpawnerProperty = (id, key, value) => {
     }), null, 4), 'utf8');
 };
 
-// const spawnChannel = async (categoryId, name, {
-//     size = null,
-//     phonetic = false
-// } = {}) => {
-//
-//     if (phonetic === true) name = getNextAvailablePhoneticName(categoryId);
-//
-//     return await guild.createChannel(name, { type: "voice", parent: categoryId, userLimit: size });
-// };
+const spawnChannel = async (categoryId, name, {
+    size = null,
+    phonetic = false
+} = {}) => {
+
+    if (phonetic === true) name = getNextAvailablePhoneticName(categoryId);
+
+    return await guild.createChannel(name, { type: "voice", parent: categoryId, userLimit: size });
+};
 
 const cleanChannels = () => {
     const spawners = getSpawners();
@@ -84,6 +119,51 @@ const cleanChannels = () => {
             // Sometimes the channel was already deleted from a previous clean channel run so we ignore the error
             channel.delete().catch(e => (e.message === "Unknown Channel") ? null : console.error("Channel Delete Error: ", e));
         });
+    }
+};
+
+const getPhoneticName = (categoryId, index) => {
+    let parentChannel = guild.channels.get(categoryId);
+    return `${parentChannel.name} ${PHONETIC_ALPHABET[index]}`;
+};
+
+const getNextAvailablePhoneticName = (categoryId) => {
+    let parentChannel = guild.channels.get(categoryId);
+    for (let i = 0; i < PHONETIC_ALPHABET.length; i++) {
+        let phoneticName = getPhoneticName(categoryId, i);
+        if (!parentChannel.children.find(channel => channel.name === phoneticName)) {
+            return phoneticName;
+        }
+    }
+    return PHONETIC_ALPHABET[PHONETIC_ALPHABET.length - 1];
+};
+
+const sortPhonetics = async (categoryId, creatorId) => {
+    // ** NOTE: Apparently discord requires administrator permission to reorder channels now, which is dangerous to give to a bot, rendering this function useless.
+    let parentChannel = guild.channels.get(categoryId);
+    let creatorChannel = guild.channels.get(creatorId);
+    console.log("Parent Channel Position: " + parentChannel.position);
+    console.log("Creator Channel Position: " + creatorChannel.position);
+    let position = creatorChannel.position + 1;
+
+    // let position = null;
+
+    for (let i = 0; i < PHONETIC_ALPHABET.length; i++) {
+        let phoneticName = getPhoneticName(categoryId, i);
+        let channel = parentChannel.children.find(channel => channel.name === phoneticName);
+
+        if (!channel) {
+            continue;
+        }
+
+        if (position == null) {
+            position = channel.position;
+            continue;
+        }
+
+        console.log("Set " + channel.name + " to " + position);
+        guild.setChannelPosition(channel.id, position).catch(e => console.error("Channel position error: ", e));
+        position++;
     }
 };
 

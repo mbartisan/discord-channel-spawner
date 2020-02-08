@@ -21,6 +21,7 @@ client.on("voiceStateUpdate", async (oldMember, newMember) => {
 
     const spawner = getSpawners().find(({creatorId}) => newMember.voiceChannelID === creatorId);
     if (!spawner) return;
+    if (BOT_CHANNEL_SPAWNER_ID && spawner.id === BOT_CHANNEL_SPAWNER_ID) return;
 
     const {categoryId,creatorId,userLimit,phonetic} = spawner;
 
@@ -50,6 +51,13 @@ client.on('message', async (message) => {
         channelName = null;
         userLimit = args[1];
     }
+    if (args.length >= 2 && !(parseInt(args[2]) == args[2])) {
+        // if passed more arguments than expected and the second argument is not a number
+        // then the user didn't escape the channel name with quotes
+        // we will treat it like ALL arguments are apart of the channel name
+        channelName = args.slice(1).join(" ");
+    }
+
     if (parseInt(userLimit) > 99) userLimit = 99;
 
     const member = await guild.members.get(message.author.id);

@@ -52,7 +52,7 @@ client.on('message', async (message) => {
         userLimit = args[1];
     }
 
-    if (args.length >= 3 && !isInt(args[2])) {
+    if (args.length >= 3 || !isInt(args[2])) {
         // if passed more arguments than expected and the second argument is not a number
         // then the user didn't escape the channel name with quotes
         // we will treat it like ALL arguments are apart of the channel name unless the last argument is a number
